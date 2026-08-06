@@ -40,6 +40,9 @@ jobs:
           if (Test-Path "./lang") { Copy-Item -Path "./lang" -Destination "./publish/lang" -Recurse }
           if (Test-Path "./config") { Copy-Item -Path "./config" -Destination "./publish/config" -Recurse }
           
+          # 入口壳改名：用户双击的根目录入口统一命名为 MCDArchive.exe（与主程序同名）
+          Move-Item -Path "./publish/MCDArchive.Launcher.exe" -Destination "./publish/MCDArchive.exe" -Force
+          
           # 清理：如果还有残留的 .pdb 或 .exp .lib (AOT 编译有时会产生)
           Get-ChildItem -Path "./publish/" -Include *.pdb,*.exp,*.lib,*.ilk -Recurse | Remove-Item -Force
 
