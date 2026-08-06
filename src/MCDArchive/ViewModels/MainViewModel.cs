@@ -3,12 +3,14 @@ using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.IO;
 using System.Linq;
+using System.Net.Http;
 using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Avalonia.Threading;
+using FluentAvalonia.UI.Controls;
 using MCDArchive.Models;
 using MCDArchive.Services;
 
@@ -112,6 +114,12 @@ public partial class MainViewModel : ObservableObject
     // 已加载的版本数量，用于语言切换时重新格式化“已加载 N 个版本”提示
     private int _versionsLoadedCount;
 
+    // 网络优先解析 manifest：缓存远程清单，优先使用网络解析成功的结果
+    private readonly Dictionary<string, McdManifest> _remoteManifests = new();
+    private readonly object _manifestLock = new();
+    private int _remoteLoadedCount;
+    private bool _loadedFromNetwork;
+
     private string ConfigDir => Path.GetFullPath(Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "..", "config"));
 
     // 语言目录与 config 同级（无需再进入上一级）
@@ -148,6 +156,11 @@ public partial class MainViewModel : ObservableObject
             }
         }
         catch { /* 目录不可读时保持空列表 */ }
+
+        // 最后防御：lang 目录缺失/为空/不可读时，至少保留 English 选项，
+        // 保证下拉菜单可用、SelectedLanguage 非空，避免后续解引用崩溃
+        if (Languages.Count == 0)
+            Languages.Add(new LanguageOption("en-US", "English"));
     }
 
     [ObservableProperty]
@@ -188,6 +201,8 @@ public partial class MainViewModel : ObservableObject
     /// <summary>从 config/settings.json 读取上次的版本 / 语言 / 安装路径。</summary>
     private void LoadSettings()
     {
+        // 构造期直接写 ObservableProperty 字段是刻意的：避免触发属性 setter 的钩子/保存逻辑（此时语言文件尚未加载）
+        #pragma warning disable MVVMTK0034
         bool hasSettings = false;
         try
         {
@@ -210,6 +225,7 @@ public partial class MainViewModel : ObservableObject
         if (!hasSettings || _selectedLanguage == null)
             _selectedLanguage ??= Languages.FirstOrDefault(l => l.Code == "en-US")
                                   ?? Languages.FirstOrDefault();
+#pragma warning restore MVVMTK0034
     }
 
     /// <summary>将当前版本 / 语言 / 安装路径写入 config/settings.json。</summary>
@@ -238,7 +254,7 @@ public partial class MainViewModel : ObservableObject
 
         // 刷新版本加载信息（若已加载过）
         if (_versionsLoadedCount > 0)
-            VersionLoadInfo = string.Format(Loc["Versions_Loaded"], _versionsLoadedCount);
+            UpdateVersionLoadInfo();
 
         // 刷新首页主按钮文案
         NotifyGameState();
@@ -289,7 +305,22 @@ public partial class MainViewModel : ObservableObject
     [RelayCommand]
     private async Task FixGameFilesAsync()
     {
-        await StartDownloadAsync($"正在修复 {SelectedVersion?.VersionName ?? ""}，校验并重新下载损坏或缺失的文件...");
+        // 仅当游戏处于“需修复”状态才允许执行修复逻辑（与主页“修复游戏”按钮一致的检测逻辑）
+        if (_gameStatus != GameStatus.NeedsRepair)
+        {
+            string msg = _gameStatus switch
+            {
+                GameStatus.Installed => Loc["Repair_NotNeeded"],
+                GameStatus.Interrupted => Loc["Repair_Interrupted"],
+                _ => Loc["Repair_NotInstalled"],
+            };
+            await ShowInfoDialogAsync(Loc["Dialog_Repair_Title"], msg);
+            return;
+        }
+
+        // 修复流程不重复触发运行库安装，完成后弹窗确认
+        if (await StartDownloadAsync(string.Format(Loc["Home_Repair_Status"], SelectedVersion?.VersionName ?? ""), runRuntimeCheck: false))
+            await ShowInfoDialogAsync(Loc["Dialog_Repair_Title"], Loc["Repair_Complete"]);
     }
 
     [RelayCommand]
@@ -297,11 +328,41 @@ public partial class MainViewModel : ObservableObject
     {
         IsBusy = true;
         bool success = await _runtimeService.InstallVcRedistAsync(s => StatusText = s);
-        if (success)
-            StatusText = "运行库环境修复完成！";
-        else
-            StatusText = "运行库安装失败或被取消。";
         IsBusy = false;
+        if (success)
+            await ShowInfoDialogAsync(Loc["Dialog_Runtime_Title"], Loc["Runtime_InstallSuccess"]);
+        else
+            await ShowInfoDialogAsync(Loc["Dialog_Runtime_Title"], Loc["Runtime_InstallFailed"]);
+    }
+
+    /// <summary>检查并安装运行库，用弹窗向用户反馈结果。</summary>
+    private async Task EnsureRuntimeInstalledAsync()
+    {
+        if (_runtimeService.IsVcRedistInstalled())
+        {
+            await ShowInfoDialogAsync(Loc["Dialog_Runtime_Title"], Loc["Runtime_AlreadyInstalled"]);
+            return;
+        }
+
+        StatusText = Loc["Runtime_Installing"];
+        bool success = await _runtimeService.InstallVcRedistAsync(s => StatusText = s);
+        if (success)
+            await ShowInfoDialogAsync(Loc["Dialog_Runtime_Title"], Loc["Runtime_InstallSuccess"]);
+        else
+            await ShowInfoDialogAsync(Loc["Dialog_Runtime_Title"], Loc["Runtime_InstallFailed"]);
+    }
+
+    /// <summary>显示一个信息提示弹窗（FluentAvalonia ContentDialog）。</summary>
+    private async Task ShowInfoDialogAsync(string title, string message)
+    {
+        var dialog = new ContentDialog
+        {
+            Title = title,
+            Content = message,
+            CloseButtonText = Loc["Dialog_OK"],
+            DefaultButton = ContentDialogButton.Close,
+        };
+        await dialog.ShowAsync();
     }
 
     // --- 下载控制 ---
@@ -373,25 +434,23 @@ public partial class MainViewModel : ObservableObject
 
     // --- 下载计划构建与执行 ---
 
-    private async Task StartDownloadAsync(string initialStatus)
+    private async Task<bool> StartDownloadAsync(string initialStatus, bool runRuntimeCheck = true)
     {
         if (SelectedVersion == null)
         {
             StatusText = "请先在【版本列表】中选择一个版本。";
-            return;
+            return false;
         }
 
         StatusText = initialStatus;
 
         try
         {
-            // 1. 加载 Manifest，构建下载计划
-            string manifestPath = Path.Combine(ConfigDir, "manifest", $"{SelectedVersion.VersionName}.json");
-            if (!File.Exists(manifestPath)) { StatusText = "错误: 找不到版本清单"; return; }
+            // 1. 加载 Manifest，构建下载计划（网络优先，缺失时回退本地）
+            var manifest = await GetManifestAsync(SelectedVersion.VersionName);
+            if (manifest == null) { StatusText = "错误: 找不到版本清单"; return false; }
 
-            var json = await File.ReadAllTextAsync(manifestPath);
-            var manifest = JsonSerializer.Deserialize<McdManifest>(json);
-            var filesToDownload = manifest?.Files?.Where(x => x.Value.Type != "directory")
+            var filesToDownload = manifest.Files?.Where(x => x.Value.Type != "directory")
                 .Select(x =>
                 {
                     var dl = x.Value.Downloads?.Raw ?? x.Value.Downloads?.Lzma;
@@ -401,19 +460,20 @@ public partial class MainViewModel : ObservableObject
                 .Select(x => x!)
                 .ToList();
 
-            if (filesToDownload == null || filesToDownload.Count == 0) { StatusText = "清单无效"; return; }
+            if (filesToDownload == null || filesToDownload.Count == 0) { StatusText = "清单无效"; return false; }
 
             _downloadPlan = filesToDownload;
             _totalBytes = filesToDownload.Sum(f => f.Size);
-            await ExecuteDownloadPlanAsync();
+            return await ExecuteDownloadPlanAsync(runRuntimeCheck);
         }
-        catch (Exception ex) { StatusText = $"错误: {ex.Message}"; }
+        catch (Exception ex) { StatusText = $"错误: {ex.Message}"; return false; }
     }
 
-    private async Task ExecuteDownloadPlanAsync()
+    private async Task<bool> ExecuteDownloadPlanAsync(bool runRuntimeCheck = true)
     {
-        if (_downloadPlan == null) return;
+        if (_downloadPlan == null) return false;
 
+        bool success = false;
         IsBusy = true;
         IsPaused = false;
         _cleanupOnCancel = false;
@@ -428,14 +488,14 @@ public partial class MainViewModel : ObservableObject
             _preCountedCount = preCount;
 
             await RunDownloadAsync(_cts.Token);
+            success = true;
 
-            // 运行库检查
-            if (!_runtimeService.IsVcRedistInstalled())
+            // 运行库检查（弹窗提示）：仅全新下载时需要，修复流程不重复安装运行库
+            if (runRuntimeCheck)
             {
-                StatusText = "正在自动安装 VC++ 运行库...";
-                await _runtimeService.InstallVcRedistAsync(s => StatusText = s);
+                await EnsureRuntimeInstalledAsync();
+                StatusText = Loc["Runtime_Ready"];
             }
-            StatusText = "安装完成，点击启动游戏即可。";
         }
         catch (OperationCanceledException)
         {
@@ -470,6 +530,8 @@ public partial class MainViewModel : ObservableObject
             _cts?.Dispose();
             _cts = null;
         }
+
+        return success;
     }
 
     private async Task RunDownloadAsync(CancellationToken token)
@@ -656,18 +718,17 @@ public partial class MainViewModel : ObservableObject
                 else
                 {
                     status = GameStatus.NeedsRepair;
-                    string manifestPath = Path.Combine(ConfigDir, "manifest", $"{SelectedVersion.VersionName}.json");
-                    if (File.Exists(manifestPath))
+                    try
                     {
-                        try
+                        var manifest = await GetManifestAsync(SelectedVersion.VersionName);
+                        if (manifest != null)
                         {
-                            var manifest = JsonSerializer.Deserialize<McdManifest>(await File.ReadAllTextAsync(manifestPath));
                             string? sha1 = GetExeSha1(manifest);
                             if (!string.IsNullOrEmpty(sha1) && await IsExeValidAsync(sha1))
                                 status = GameStatus.Installed;
                         }
-                        catch { /* 清单读取失败则视为需修复 */ }
                     }
+                    catch { /* 清单读取失败则视为需修复 */ }
                 }
             }
         }
@@ -722,16 +783,75 @@ public partial class MainViewModel : ObservableObject
 
             var json = await File.ReadAllTextAsync(path);
             var list = JsonSerializer.Deserialize<ObservableCollection<McdVersion>>(json, new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+            var versions = list ?? new ObservableCollection<McdVersion>();
+
+            // 网络优先：并发拉取各版本的清单，统计网络解析成功数
+            _remoteLoadedCount = await FetchRemoteManifestsAsync(versions);
+            _loadedFromNetwork = _remoteLoadedCount > 0;
 
             Dispatcher.UIThread.Post(() => {
-                Versions = list ?? new();
+                Versions = versions;
                 // 默认选中 1.17.0.0，不存在则回退到第一个
                 SelectedVersion = Versions.FirstOrDefault(v => v.VersionName == _savedVersionName) ?? Versions.FirstOrDefault();
                 _versionsLoadedCount = Versions.Count;
-                VersionLoadInfo = string.Format(Loc["Versions_Loaded"], Versions.Count);
+                UpdateVersionLoadInfo();
             });
         }
         catch (Exception ex) { VersionLoadInfo = $"加载失败: {ex.Message}"; }
+    }
+
+    /// <summary>并发从各版本的 VersionLink 拉取 manifest，成功则缓存并计数。网络失败静默回退本地。</summary>
+    private async Task<int> FetchRemoteManifestsAsync(IEnumerable<McdVersion> versions)
+    {
+        int ok = 0;
+        using var client = new HttpClient { Timeout = TimeSpan.FromSeconds(10) };
+        var tasks = versions.Select(async v =>
+        {
+            if (string.IsNullOrWhiteSpace(v.VersionLink)) return;
+            try
+            {
+                var json = await client.GetStringAsync(v.VersionLink);
+                var manifest = JsonSerializer.Deserialize<McdManifest>(json);
+                if (manifest?.Files != null)
+                {
+                    lock (_manifestLock)
+                    {
+                        _remoteManifests[v.VersionName] = manifest;
+                        ok++;
+                    }
+                }
+            }
+            catch { /* 网络失败则回退到本地 manifest */ }
+        });
+        await Task.WhenAll(tasks);
+        return ok;
+    }
+
+    /// <summary>获取某版本的 manifest：优先使用网络解析缓存，缺失时回退本地 manifest 文件夹。</summary>
+    private async Task<McdManifest?> GetManifestAsync(string versionName)
+    {
+        if (_remoteManifests.TryGetValue(versionName, out var remote)) return remote;
+        string path = Path.Combine(ConfigDir, "manifest", $"{versionName}.json");
+        if (!File.Exists(path)) return null;
+        return JsonSerializer.Deserialize<McdManifest>(await File.ReadAllTextAsync(path));
+    }
+
+    /// <summary>统计本地 manifest 文件夹中可用的清单数量（网络失败时的本地回退显示）。</summary>
+    private int CountLocalManifests()
+    {
+        string dir = Path.Combine(ConfigDir, "manifest");
+        if (!Directory.Exists(dir)) return 0;
+        try { return Directory.EnumerateFiles(dir, "*.json").Count(); }
+        catch { return 0; }
+    }
+
+    /// <summary>按加载来源刷新“已加载 N 个版本”提示：网络解析成功显示“已加载”，否则显示“本地已加载”。</summary>
+    private void UpdateVersionLoadInfo()
+    {
+        if (_loadedFromNetwork)
+            VersionLoadInfo = string.Format(Loc["Versions_Loaded_Network"], _remoteLoadedCount);
+        else
+            VersionLoadInfo = string.Format(Loc["Versions_Loaded"], CountLocalManifests());
     }
 
     private void UpdateUIProgress(long current, long total, int count, int totalCount, DateTime start)

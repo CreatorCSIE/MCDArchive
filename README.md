@@ -1,5 +1,10 @@
 # MCDArchive - Minecraft Dungeons 历史版本启动器
 
+> [!IMPORTANT]
+> **📢 重要提示：**
+> 1. 本启动器只提供正版 Minecraft Dungeons 资源，不负责任何形式的盗版 Patch。因此，在启动游戏时遇到需要微软账号登录验证属于**完全正常**的现象。
+> 2. 由于程序采用 **Native AOT** 原生编译以追求极致性能与纯净度，部分杀毒软件可能会出现**误报（误杀）**。本项目完全开源，请放心运行，或将其加入白名单。
+
 `MCDArchive` 是一款基于 .NET 8 与 **Avalonia UI** 开发的开源启动器，专为下载、管理及启动《我的世界：地下城》（Minecraft Dungeons）的历史版本而设计。
 
 本项目采用 **Native AOT 引导技术**，实现了主程序与依赖库的彻底分离，为用户提供一个极致纯净的根目录运行环境，同时具备完善的断点续传与校验机制。
@@ -98,4 +103,4 @@ dotnet publish src/MCDArchive.Launcher/Launcher.csproj -c Release -r win-x64 -o 
 
 - **为什么有两个 MCDArchive.exe？** 根目录的是“引导器”，负责保持环境整洁；`app/` 目录下的是“核心程序”。用户应始终点击根目录的文件。
 - **下载卡在 0%？** 请检查网络连接，或确认 `config/manifest` 中的下载链接在您所在地区是否可达。
-- **如何添加新版本？** 在 `config/mcd_versions.json` 中添加条目，并确保 `config/manifest/` 下有对应的清单文件。
+- **如何添加新版本？** 在 `config/mcd_versions.json` 中添加条目。
