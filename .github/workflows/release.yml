@@ -46,6 +46,24 @@ jobs:
           # 清理：如果还有残留的 .pdb 或 .exp .lib (AOT 编译有时会产生)
           Get-ChildItem -Path "./publish/" -Include *.pdb,*.exp,*.lib,*.ilk -Recurse | Remove-Item -Force
 
+      # 3.5 自签：从 GitHub Secrets 解码 pfx 并用 signtool 对根目录入口签名
+      #     未配置 SIGNING_PFX_BASE64 时自动跳过（不影响构建）
+      - name: Sign Launcher (self-signed)
+        if: env.SIGNING_PFX_BASE64 != ''
+        shell: pwsh
+        env:
+          SIGNING_PFX_BASE64: ${{ secrets.SIGNING_PFX_BASE64 }}
+          SIGNING_PFX_PASSWORD: ${{ secrets.SIGNING_PFX_PASSWORD }}
+        run: |
+          $pfx = Join-Path $env:RUNNER_TEMP "signing.pfx"
+          [IO.File]::WriteAllBytes($pfx, [Convert]::FromBase64String($env:SIGNING_PFX_BASE64))
+
+          # 定位 signtool（随 .NET SDK / Windows SDK 提供）
+          $signtool = Get-ChildItem "./Program Files (x86)/Windows Kits/10/bin/*/x64/signtool.exe" -ErrorAction SilentlyContinue | Select-Object -First 1
+          if (-not $signtool) { throw "未找到 signtool.exe" }
+
+          & $signtool.FullName sign /fd sha256 /sha1 "" /f $pfx /p $env:SIGNING_PFX_PASSWORD /tr http://timestamp.digicert.com /td sha256 ./publish/MCDArchive.exe
+
       # 4. 仅 dev 分支上传到 Artifacts；main 分支只跑构建，不上传
       - name: Upload Artifact
         if: github.ref == 'refs/heads/dev'
