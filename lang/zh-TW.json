@@ -15,6 +15,7 @@
   "Versions_Title": "版本列表",
   "Versions_Subtitle": "選擇要下載或遊玩的遊戲版本。",
   "Versions_Loaded": "本機已載入 {0} 個版本",
+  "Versions_Loaded_Network": "已載入 {0} 個版本",
   "Settings_Title": "設定",
   "Settings_InstallPath": "遊戲安裝路徑：",
   "Settings_Watermark": "選擇遊戲安裝或補全目錄",

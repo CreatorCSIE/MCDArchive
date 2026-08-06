@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.IO;
 using System.Linq;
+using System.Net.Http;
 using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
@@ -112,6 +113,12 @@ public partial class MainViewModel : ObservableObject
 
     // 已加载的版本数量，用于语言切换时重新格式化“已加载 N 个版本”提示
     private int _versionsLoadedCount;
+
+    // 网络优先解析 manifest：缓存远程清单，优先使用网络解析成功的结果
+    private readonly Dictionary<string, McdManifest> _remoteManifests = new();
+    private readonly object _manifestLock = new();
+    private int _remoteLoadedCount;
+    private bool _loadedFromNetwork;
 
     private string ConfigDir => Path.GetFullPath(Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "..", "config"));
 
@@ -239,7 +246,7 @@ public partial class MainViewModel : ObservableObject
 
         // 刷新版本加载信息（若已加载过）
         if (_versionsLoadedCount > 0)
-            VersionLoadInfo = string.Format(Loc["Versions_Loaded"], _versionsLoadedCount);
+            UpdateVersionLoadInfo();
 
         // 刷新首页主按钮文案
         NotifyGameState();
@@ -431,13 +438,11 @@ public partial class MainViewModel : ObservableObject
 
         try
         {
-            // 1. 加载 Manifest，构建下载计划
-            string manifestPath = Path.Combine(ConfigDir, "manifest", $"{SelectedVersion.VersionName}.json");
-            if (!File.Exists(manifestPath)) { StatusText = "错误: 找不到版本清单"; return false; }
+            // 1. 加载 Manifest，构建下载计划（网络优先，缺失时回退本地）
+            var manifest = await GetManifestAsync(SelectedVersion.VersionName);
+            if (manifest == null) { StatusText = "错误: 找不到版本清单"; return false; }
 
-            var json = await File.ReadAllTextAsync(manifestPath);
-            var manifest = JsonSerializer.Deserialize<McdManifest>(json);
-            var filesToDownload = manifest?.Files?.Where(x => x.Value.Type != "directory")
+            var filesToDownload = manifest.Files?.Where(x => x.Value.Type != "directory")
                 .Select(x =>
                 {
                     var dl = x.Value.Downloads?.Raw ?? x.Value.Downloads?.Lzma;
@@ -705,18 +710,17 @@ public partial class MainViewModel : ObservableObject
                 else
                 {
                     status = GameStatus.NeedsRepair;
-                    string manifestPath = Path.Combine(ConfigDir, "manifest", $"{SelectedVersion.VersionName}.json");
-                    if (File.Exists(manifestPath))
+                    try
                     {
-                        try
+                        var manifest = await GetManifestAsync(SelectedVersion.VersionName);
+                        if (manifest != null)
                         {
-                            var manifest = JsonSerializer.Deserialize<McdManifest>(await File.ReadAllTextAsync(manifestPath));
                             string? sha1 = GetExeSha1(manifest);
                             if (!string.IsNullOrEmpty(sha1) && await IsExeValidAsync(sha1))
                                 status = GameStatus.Installed;
                         }
-                        catch { /* 清单读取失败则视为需修复 */ }
                     }
+                    catch { /* 清单读取失败则视为需修复 */ }
                 }
             }
         }
@@ -771,16 +775,75 @@ public partial class MainViewModel : ObservableObject
 
             var json = await File.ReadAllTextAsync(path);
             var list = JsonSerializer.Deserialize<ObservableCollection<McdVersion>>(json, new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+            var versions = list ?? new ObservableCollection<McdVersion>();
+
+            // 网络优先：并发拉取各版本的清单，统计网络解析成功数
+            _remoteLoadedCount = await FetchRemoteManifestsAsync(versions);
+            _loadedFromNetwork = _remoteLoadedCount > 0;
 
             Dispatcher.UIThread.Post(() => {
-                Versions = list ?? new();
+                Versions = versions;
                 // 默认选中 1.17.0.0，不存在则回退到第一个
                 SelectedVersion = Versions.FirstOrDefault(v => v.VersionName == _savedVersionName) ?? Versions.FirstOrDefault();
                 _versionsLoadedCount = Versions.Count;
-                VersionLoadInfo = string.Format(Loc["Versions_Loaded"], Versions.Count);
+                UpdateVersionLoadInfo();
             });
         }
         catch (Exception ex) { VersionLoadInfo = $"加载失败: {ex.Message}"; }
+    }
+
+    /// <summary>并发从各版本的 VersionLink 拉取 manifest，成功则缓存并计数。网络失败静默回退本地。</summary>
+    private async Task<int> FetchRemoteManifestsAsync(IEnumerable<McdVersion> versions)
+    {
+        int ok = 0;
+        using var client = new HttpClient { Timeout = TimeSpan.FromSeconds(10) };
+        var tasks = versions.Select(async v =>
+        {
+            if (string.IsNullOrWhiteSpace(v.VersionLink)) return;
+            try
+            {
+                var json = await client.GetStringAsync(v.VersionLink);
+                var manifest = JsonSerializer.Deserialize<McdManifest>(json);
+                if (manifest?.Files != null)
+                {
+                    lock (_manifestLock)
+                    {
+                        _remoteManifests[v.VersionName] = manifest;
+                        ok++;
+                    }
+                }
+            }
+            catch { /* 网络失败则回退到本地 manifest */ }
+        });
+        await Task.WhenAll(tasks);
+        return ok;
+    }
+
+    /// <summary>获取某版本的 manifest：优先使用网络解析缓存，缺失时回退本地 manifest 文件夹。</summary>
+    private async Task<McdManifest?> GetManifestAsync(string versionName)
+    {
+        if (_remoteManifests.TryGetValue(versionName, out var remote)) return remote;
+        string path = Path.Combine(ConfigDir, "manifest", $"{versionName}.json");
+        if (!File.Exists(path)) return null;
+        return JsonSerializer.Deserialize<McdManifest>(await File.ReadAllTextAsync(path));
+    }
+
+    /// <summary>统计本地 manifest 文件夹中可用的清单数量（网络失败时的本地回退显示）。</summary>
+    private int CountLocalManifests()
+    {
+        string dir = Path.Combine(ConfigDir, "manifest");
+        if (!Directory.Exists(dir)) return 0;
+        try { return Directory.EnumerateFiles(dir, "*.json").Count(); }
+        catch { return 0; }
+    }
+
+    /// <summary>按加载来源刷新“已加载 N 个版本”提示：网络解析成功显示“已加载”，否则显示“本地已加载”。</summary>
+    private void UpdateVersionLoadInfo()
+    {
+        if (_loadedFromNetwork)
+            VersionLoadInfo = string.Format(Loc["Versions_Loaded_Network"], _remoteLoadedCount);
+        else
+            VersionLoadInfo = string.Format(Loc["Versions_Loaded"], CountLocalManifests());
     }
 
     private void UpdateUIProgress(long current, long total, int count, int totalCount, DateTime start)

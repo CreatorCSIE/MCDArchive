@@ -39,6 +39,14 @@ jobs:
           # 复制资源
           if (Test-Path "./lang") { Copy-Item -Path "./lang" -Destination "./publish/lang" -Recurse }
           if (Test-Path "./config") { Copy-Item -Path "./config" -Destination "./publish/config" -Recurse }
+
+          # 无论 checkout 是否带出 config/manifest（版本 json 被 gitignore），都确保发布包内含该目录，
+          # 作为运行时网络解析失败的本地回退目录。upload-artifact 不会保留空目录，
+          # 因此写入 .gitkeep 占位文件，保证目录出现在最终 zip 中。
+          New-Item -ItemType Directory -Force -Path "./publish/config/manifest" | Out-Null
+          if (-not (Test-Path "./publish/config/manifest/.gitkeep")) {
+            New-Item -ItemType File -Force -Path "./publish/config/manifest/.gitkeep" | Out-Null
+          }
           
           # 入口壳改名：用户双击的根目录入口统一命名为 MCDArchive.exe（与主程序同名）
           Move-Item -Path "./publish/MCDArchive.Launcher.exe" -Destination "./publish/MCDArchive.exe" -Force

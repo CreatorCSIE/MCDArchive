@@ -15,6 +15,7 @@
   "Versions_Title": "Versions",
   "Versions_Subtitle": "Select a game version to download or play.",
   "Versions_Loaded": "{0} versions loaded locally",
+  "Versions_Loaded_Network": "{0} versions loaded",
   "Settings_Title": "Settings",
   "Settings_InstallPath": "Game Install Path:",
   "Settings_Watermark": "Select the game install or completion directory",

@@ -15,6 +15,7 @@
   "Versions_Title": "版本列表",
   "Versions_Subtitle": "选择要下载或游玩的游戏版本。",
   "Versions_Loaded": "本地已加载 {0} 个版本",
+  "Versions_Loaded_Network": "已加载 {0} 个版本",
   "Settings_Title": "设置",
   "Settings_InstallPath": "游戏安装路径：",
   "Settings_Watermark": "选择游戏安装或补全目录",
