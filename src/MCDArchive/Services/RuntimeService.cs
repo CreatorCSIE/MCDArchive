@@ -63,17 +63,29 @@ public class RuntimeService
             if (process != null)
             {
                 await process.WaitForExitAsync();
-                return process.ExitCode == 0 || process.ExitCode == 3010; // 3010 代表需要重启，但安装已成功
+                bool ok = process.ExitCode == 0 || process.ExitCode == 3010; // 3010 代表需要重启，但安装已成功
+                if (!ok) statusCallback?.Invoke($"运行库安装失败 (退出码 {process.ExitCode})，请手动安装。");
+                return ok;
             }
+
+            statusCallback?.Invoke("无法启动运行库安装程序。");
+            return false;
+        }
+        // 用户点了 UAC 弹窗的“否”，错误码 1223
+        catch (System.ComponentModel.Win32Exception ex) when (ex.NativeErrorCode == 1223)
+        {
+            statusCallback?.Invoke("已取消安装 VC++ 运行库（未授予管理员权限）。");
+            return false;
         }
         catch (Exception ex)
         {
-            Debug.WriteLine($"安装运行库失败: {ex.Message}");
+            // 把错误信息回传到 UI，避免静默退出
+            statusCallback?.Invoke($"安装 VC++ 运行库失败: {ex.Message}");
+            return false;
         }
         finally
         {
             if (File.Exists(_tempPath)) File.Delete(_tempPath);
         }
-        return false;
     }
 }
