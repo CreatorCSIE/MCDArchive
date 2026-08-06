@@ -172,7 +172,7 @@
                                         <TextBlock Grid.Column="1" Text="Minecraft Dungeons Archive Launcher"
                                                    Margin="8,0,0,0" FontWeight="Bold" Foreground="#FFFFFF"
                                                    VerticalAlignment="Center"/>
-                                        <TextBlock Grid.Column="3" Text="dev (Codename: MCDArchive)"
+                                        <TextBlock Grid.Column="3" Text="1.0 (Codename: MCDArchive)"
                                                    Foreground="#A0A0A0" FontSize="12" VerticalAlignment="Center"/>
                                     </Grid>
                                 </Expander.Header>
