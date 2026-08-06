@@ -6,7 +6,7 @@
                  xmlns:svg="using:Avalonia.Svg.Skia"
                  x:Class="MCDArchive.Views.MainWindow"
                  x:DataType="vm:MainViewModel"
-                 Title="Minecraft Dungeons 历史版本启动器"
+                 Title="{Binding Loc[App_Title]}"
                  Width="950" Height="600"
                  WindowStartupLocation="CenterScreen"
                  Background="#1E1E1E">
