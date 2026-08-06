@@ -103,4 +103,4 @@ dotnet publish src/MCDArchive.Launcher/Launcher.csproj -c Release -r win-x64 -o 
 
 - **为什么有两个 MCDArchive.exe？** 根目录的是“引导器”，负责保持环境整洁；`app/` 目录下的是“核心程序”。用户应始终点击根目录的文件。
 - **下载卡在 0%？** 请检查网络连接，或确认 `config/manifest` 中的下载链接在您所在地区是否可达。
-- **如何添加新版本？** 在 `config/mcd_versions.json` 中添加条目，并确保 `config/manifest/` 下有对应的清单文件。
+- **如何添加新版本？** 在 `config/mcd_versions.json` 中添加条目。
