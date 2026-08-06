@@ -29,5 +29,17 @@
   "About_ProjectHome": "Project Home",
   "About_ExpanderIssues": "Having issues?",
   "About_Feedback": "Feedback",
-  "About_SubmitIssues": "Submit Issues"
+  "About_SubmitIssues": "Submit Issues",
+  "Dialog_OK": "OK",
+  "Dialog_Runtime_Title": "Runtime Check",
+  "Runtime_AlreadyInstalled": "VC++ runtime detected, no installation needed.",
+  "Runtime_InstallSuccess": "VC++ runtime installed successfully.",
+  "Runtime_InstallFailed": "VC++ runtime installation failed or was cancelled. Please install the runtime manually and then launch the game.",
+  "Runtime_Installing": "Installing VC++ runtime automatically, please watch for the administrator authorization prompt...",
+  "Runtime_Ready": "Installation complete. Click Launch Game to start.",
+  "Dialog_Repair_Title": "Repair Game Files",
+  "Repair_NotNeeded": "Game files are complete, no repair needed.",
+  "Repair_Interrupted": "There is an unfinished download. Please resume it first.",
+  "Repair_NotInstalled": "No game files detected. Please download the game first.",
+  "Repair_Complete": "Game files repaired successfully."
 }

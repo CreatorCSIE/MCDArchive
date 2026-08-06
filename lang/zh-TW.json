@@ -29,5 +29,17 @@
   "About_ProjectHome": "專案首頁",
   "About_ExpanderIssues": "遇到問題？",
   "About_Feedback": "問題回報",
-  "About_SubmitIssues": "提交 Issues"
+  "About_SubmitIssues": "提交 Issues",
+  "Dialog_OK": "確定",
+  "Dialog_Runtime_Title": "執行環境檢查",
+  "Runtime_AlreadyInstalled": "已偵測到 VC++ 執行環境，無需安裝。",
+  "Runtime_InstallSuccess": "VC++ 執行環境安裝成功。",
+  "Runtime_InstallFailed": "VC++ 執行環境安裝失敗或已取消，請手動安裝執行環境後再啟動遊戲。",
+  "Runtime_Installing": "正在自動安裝 VC++ 執行環境，請留意彈出的系統管理員授權視窗...",
+  "Runtime_Ready": "安裝完成，點擊【啟動遊戲】即可。",
+  "Dialog_Repair_Title": "修復遊戲檔案",
+  "Repair_NotNeeded": "遊戲檔案完整，無需修復。",
+  "Repair_Interrupted": "存在未完成的下載，請先恢復下載。",
+  "Repair_NotInstalled": "未偵測到遊戲檔案，請先下載遊戲。",
+  "Repair_Complete": "遊戲檔案修復完成。"
 }

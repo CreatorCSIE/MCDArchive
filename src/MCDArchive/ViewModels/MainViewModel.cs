@@ -9,6 +9,7 @@ using System.Threading.Tasks;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Avalonia.Threading;
+using FluentAvalonia.UI.Controls;
 using MCDArchive.Models;
 using MCDArchive.Services;
 
@@ -289,7 +290,22 @@ public partial class MainViewModel : ObservableObject
     [RelayCommand]
     private async Task FixGameFilesAsync()
     {
-        await StartDownloadAsync($"正在修复 {SelectedVersion?.VersionName ?? ""}，校验并重新下载损坏或缺失的文件...");
+        // 仅当游戏处于“需修复”状态才允许执行修复逻辑（与主页“修复游戏”按钮一致的检测逻辑）
+        if (_gameStatus != GameStatus.NeedsRepair)
+        {
+            string msg = _gameStatus switch
+            {
+                GameStatus.Installed => Loc["Repair_NotNeeded"],
+                GameStatus.Interrupted => Loc["Repair_Interrupted"],
+                _ => Loc["Repair_NotInstalled"],
+            };
+            await ShowInfoDialogAsync(Loc["Dialog_Repair_Title"], msg);
+            return;
+        }
+
+        // 修复流程不重复触发运行库安装，完成后弹窗确认
+        if (await StartDownloadAsync(string.Format(Loc["Home_Repair_Status"], SelectedVersion?.VersionName ?? ""), runRuntimeCheck: false))
+            await ShowInfoDialogAsync(Loc["Dialog_Repair_Title"], Loc["Repair_Complete"]);
     }
 
     [RelayCommand]
@@ -297,11 +313,41 @@ public partial class MainViewModel : ObservableObject
     {
         IsBusy = true;
         bool success = await _runtimeService.InstallVcRedistAsync(s => StatusText = s);
-        if (success)
-            StatusText = "运行库环境修复完成！";
-        else
-            StatusText = "运行库安装失败或被取消。";
         IsBusy = false;
+        if (success)
+            await ShowInfoDialogAsync(Loc["Dialog_Runtime_Title"], Loc["Runtime_InstallSuccess"]);
+        else
+            await ShowInfoDialogAsync(Loc["Dialog_Runtime_Title"], Loc["Runtime_InstallFailed"]);
+    }
+
+    /// <summary>检查并安装运行库，用弹窗向用户反馈结果。</summary>
+    private async Task EnsureRuntimeInstalledAsync()
+    {
+        if (_runtimeService.IsVcRedistInstalled())
+        {
+            await ShowInfoDialogAsync(Loc["Dialog_Runtime_Title"], Loc["Runtime_AlreadyInstalled"]);
+            return;
+        }
+
+        StatusText = Loc["Runtime_Installing"];
+        bool success = await _runtimeService.InstallVcRedistAsync(s => StatusText = s);
+        if (success)
+            await ShowInfoDialogAsync(Loc["Dialog_Runtime_Title"], Loc["Runtime_InstallSuccess"]);
+        else
+            await ShowInfoDialogAsync(Loc["Dialog_Runtime_Title"], Loc["Runtime_InstallFailed"]);
+    }
+
+    /// <summary>显示一个信息提示弹窗（FluentAvalonia ContentDialog）。</summary>
+    private async Task ShowInfoDialogAsync(string title, string message)
+    {
+        var dialog = new ContentDialog
+        {
+            Title = title,
+            Content = message,
+            CloseButtonText = Loc["Dialog_OK"],
+            DefaultButton = ContentDialogButton.Close,
+        };
+        await dialog.ShowAsync();
     }
 
     // --- 下载控制 ---
@@ -373,12 +419,12 @@ public partial class MainViewModel : ObservableObject
 
     // --- 下载计划构建与执行 ---
 
-    private async Task StartDownloadAsync(string initialStatus)
+    private async Task<bool> StartDownloadAsync(string initialStatus, bool runRuntimeCheck = true)
     {
         if (SelectedVersion == null)
         {
             StatusText = "请先在【版本列表】中选择一个版本。";
-            return;
+            return false;
         }
 
         StatusText = initialStatus;
@@ -387,7 +433,7 @@ public partial class MainViewModel : ObservableObject
         {
             // 1. 加载 Manifest，构建下载计划
             string manifestPath = Path.Combine(ConfigDir, "manifest", $"{SelectedVersion.VersionName}.json");
-            if (!File.Exists(manifestPath)) { StatusText = "错误: 找不到版本清单"; return; }
+            if (!File.Exists(manifestPath)) { StatusText = "错误: 找不到版本清单"; return false; }
 
             var json = await File.ReadAllTextAsync(manifestPath);
             var manifest = JsonSerializer.Deserialize<McdManifest>(json);
@@ -401,19 +447,20 @@ public partial class MainViewModel : ObservableObject
                 .Select(x => x!)
                 .ToList();
 
-            if (filesToDownload == null || filesToDownload.Count == 0) { StatusText = "清单无效"; return; }
+            if (filesToDownload == null || filesToDownload.Count == 0) { StatusText = "清单无效"; return false; }
 
             _downloadPlan = filesToDownload;
             _totalBytes = filesToDownload.Sum(f => f.Size);
-            await ExecuteDownloadPlanAsync();
+            return await ExecuteDownloadPlanAsync(runRuntimeCheck);
         }
-        catch (Exception ex) { StatusText = $"错误: {ex.Message}"; }
+        catch (Exception ex) { StatusText = $"错误: {ex.Message}"; return false; }
     }
 
-    private async Task ExecuteDownloadPlanAsync()
+    private async Task<bool> ExecuteDownloadPlanAsync(bool runRuntimeCheck = true)
     {
-        if (_downloadPlan == null) return;
+        if (_downloadPlan == null) return false;
 
+        bool success = false;
         IsBusy = true;
         IsPaused = false;
         _cleanupOnCancel = false;
@@ -428,14 +475,14 @@ public partial class MainViewModel : ObservableObject
             _preCountedCount = preCount;
 
             await RunDownloadAsync(_cts.Token);
+            success = true;
 
-            // 运行库检查
-            if (!_runtimeService.IsVcRedistInstalled())
+            // 运行库检查（弹窗提示）：仅全新下载时需要，修复流程不重复安装运行库
+            if (runRuntimeCheck)
             {
-                StatusText = "正在自动安装 VC++ 运行库...";
-                await _runtimeService.InstallVcRedistAsync(s => StatusText = s);
+                await EnsureRuntimeInstalledAsync();
+                StatusText = Loc["Runtime_Ready"];
             }
-            StatusText = "安装完成，点击启动游戏即可。";
         }
         catch (OperationCanceledException)
         {
@@ -470,6 +517,8 @@ public partial class MainViewModel : ObservableObject
             _cts?.Dispose();
             _cts = null;
         }
+
+        return success;
     }
 
     private async Task RunDownloadAsync(CancellationToken token)

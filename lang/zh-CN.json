@@ -29,5 +29,17 @@
   "About_ProjectHome": "项目主页",
   "About_ExpanderIssues": "遇到问题？",
   "About_Feedback": "问题反馈",
-  "About_SubmitIssues": "提交 Issues"
+  "About_SubmitIssues": "提交 Issues",
+  "Dialog_OK": "确定",
+  "Dialog_Runtime_Title": "运行库检查",
+  "Runtime_AlreadyInstalled": "已检测到 VC++ 运行库，无需安装。",
+  "Runtime_InstallSuccess": "VC++ 运行库安装成功。",
+  "Runtime_InstallFailed": "VC++ 运行库安装失败或被取消，请手动安装运行库后再启动游戏。",
+  "Runtime_Installing": "正在自动安装 VC++ 运行库，请留意弹出的管理员授权窗口...",
+  "Runtime_Ready": "安装完成，点击【启动游戏】即可。",
+  "Dialog_Repair_Title": "修复游戏文件",
+  "Repair_NotNeeded": "游戏文件完整，无需修复。",
+  "Repair_Interrupted": "存在未完成的下载，请先恢复下载。",
+  "Repair_NotInstalled": "未检测到游戏文件，请先下载游戏。",
+  "Repair_Complete": "游戏文件修复完成。"
 }

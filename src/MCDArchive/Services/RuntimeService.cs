@@ -63,8 +63,10 @@ public class RuntimeService
             if (process != null)
             {
                 await process.WaitForExitAsync();
-                bool ok = process.ExitCode == 0 || process.ExitCode == 3010; // 3010 代表需要重启，但安装已成功
+                // 0 = 安装成功; 3010 = 安装成功但需重启; 1638 = 已存在另一版本（可视为已安装成功）
+                bool ok = process.ExitCode == 0 || process.ExitCode == 3010 || process.ExitCode == 1638;
                 if (!ok) statusCallback?.Invoke($"运行库安装失败 (退出码 {process.ExitCode})，请手动安装。");
+                else statusCallback?.Invoke("运行库安装完成。");
                 return ok;
             }
 
