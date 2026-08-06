@@ -41,5 +41,7 @@
   "Repair_NotNeeded": "Game files are complete, no repair needed.",
   "Repair_Interrupted": "There is an unfinished download. Please resume it first.",
   "Repair_NotInstalled": "No game files detected. Please download the game first.",
-  "Repair_Complete": "Game files repaired successfully."
+  "Repair_Complete": "Game files repaired successfully.",
+  "Dialog_LinkError_Title": "Failed to Open Link",
+  "Dialog_LinkError_Content": "Unable to open the link: {0}. Please check your default browser settings and try again."
 }

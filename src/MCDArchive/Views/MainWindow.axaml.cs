@@ -1,5 +1,6 @@
 using System;
 using System.Diagnostics;
+using System.Threading.Tasks;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Interactivity;
@@ -46,9 +47,33 @@ public partial class MainWindow : Window
     }
 
     // 打开超链接
-    private void OpenLink_Click(object? sender, RoutedEventArgs e)
+    private async void OpenLink_Click(object? sender, RoutedEventArgs e)
     {
-        if (sender is Button { CommandParameter: string url } && !string.IsNullOrEmpty(url))
+        if (sender is not Button { CommandParameter: string url } || string.IsNullOrEmpty(url)) return;
+        try
+        {
+            // UseShellExecute=true 交给系统默认程序打开 URL；失败时弹窗提示，不再崩溃
             Process.Start(new ProcessStartInfo(url) { UseShellExecute = true });
+        }
+        catch
+        {
+            await ShowLinkErrorAsync(url);
+        }
+    }
+
+    // 链接打开失败时弹出提示
+    private async Task ShowLinkErrorAsync(string url)
+    {
+        var vm = DataContext as MainViewModel;
+        string title = vm?.Loc["Dialog_LinkError_Title"] ?? "打开链接失败";
+        string content = string.Format(vm?.Loc["Dialog_LinkError_Content"] ?? "无法打开链接：{0}", url);
+        var dialog = new ContentDialog
+        {
+            Title = title,
+            Content = content,
+            CloseButtonText = vm?.Loc["Dialog_OK"] ?? "确定",
+            DefaultButton = ContentDialogButton.Close,
+        };
+        await dialog.ShowAsync();
     }
 }

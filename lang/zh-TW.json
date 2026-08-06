@@ -41,5 +41,7 @@
   "Repair_NotNeeded": "遊戲檔案完整，無需修復。",
   "Repair_Interrupted": "存在未完成的下載，請先恢復下載。",
   "Repair_NotInstalled": "未偵測到遊戲檔案，請先下載遊戲。",
-  "Repair_Complete": "遊戲檔案修復完成。"
+  "Repair_Complete": "遊戲檔案修復完成。",
+  "Dialog_LinkError_Title": "開啟連結失敗",
+  "Dialog_LinkError_Content": "無法開啟連結：{0}。請檢查預設瀏覽器設定後重試。"
 }

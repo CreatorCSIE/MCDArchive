@@ -41,5 +41,7 @@
   "Repair_NotNeeded": "游戏文件完整，无需修复。",
   "Repair_Interrupted": "存在未完成的下载，请先恢复下载。",
   "Repair_NotInstalled": "未检测到游戏文件，请先下载游戏。",
-  "Repair_Complete": "游戏文件修复完成。"
+  "Repair_Complete": "游戏文件修复完成。",
+  "Dialog_LinkError_Title": "打开链接失败",
+  "Dialog_LinkError_Content": "无法打开链接：{0}。请检查默认浏览器设置后重试。"
 }
