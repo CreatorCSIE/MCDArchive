@@ -156,6 +156,11 @@ public partial class MainViewModel : ObservableObject
             }
         }
         catch { /* 目录不可读时保持空列表 */ }
+
+        // 最后防御：lang 目录缺失/为空/不可读时，至少保留 English 选项，
+        // 保证下拉菜单可用、SelectedLanguage 非空，避免后续解引用崩溃
+        if (Languages.Count == 0)
+            Languages.Add(new LanguageOption("en-US", "English"));
     }
 
     [ObservableProperty]
@@ -196,6 +201,8 @@ public partial class MainViewModel : ObservableObject
     /// <summary>从 config/settings.json 读取上次的版本 / 语言 / 安装路径。</summary>
     private void LoadSettings()
     {
+        // 构造期直接写 ObservableProperty 字段是刻意的：避免触发属性 setter 的钩子/保存逻辑（此时语言文件尚未加载）
+        #pragma warning disable MVVMTK0034
         bool hasSettings = false;
         try
         {
@@ -218,6 +225,7 @@ public partial class MainViewModel : ObservableObject
         if (!hasSettings || _selectedLanguage == null)
             _selectedLanguage ??= Languages.FirstOrDefault(l => l.Code == "en-US")
                                   ?? Languages.FirstOrDefault();
+#pragma warning restore MVVMTK0034
     }
 
     /// <summary>将当前版本 / 语言 / 安装路径写入 config/settings.json。</summary>
