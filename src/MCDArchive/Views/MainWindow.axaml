@@ -1,0 +1,278 @@
+<Window xmlns="https://github.com/avaloniaui"
+                 xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+                 xmlns:vm="using:MCDArchive.ViewModels"
+                 xmlns:models="using:MCDArchive.Models"
+                 xmlns:fa="using:FluentAvalonia.UI.Controls"
+                 xmlns:svg="using:Avalonia.Svg.Skia"
+                 x:Class="MCDArchive.Views.MainWindow"
+                 x:DataType="vm:MainViewModel"
+                 Title="Minecraft Dungeons 历史版本启动器"
+                 Width="950" Height="600"
+                 WindowStartupLocation="CenterScreen"
+                 Background="#1E1E1E">
+
+    <Design.DataContext>
+        <vm:MainViewModel/>
+    </Design.DataContext>
+
+    <fa:NavigationView x:Name="NavView"
+                       PaneDisplayMode="Left"
+                       OpenPaneLength="220"
+                       CompactPaneLength="64"
+                       IsPaneToggleButtonVisible="True"
+                       IsSettingsVisible="False"
+                       AlwaysShowHeader="False"
+                       SelectionChanged="NavView_SelectionChanged"
+                       Background="Transparent">
+
+        <!-- 侧边栏导航：首页 / 版本列表 / 设置 -->
+        <fa:NavigationView.MenuItems>
+            <fa:NavigationViewItem Content="{Binding Loc[Nav_Home]}" Tag="Home" IsSelected="True">
+                <fa:NavigationViewItem.IconSource>
+                    <fa:SymbolIconSource Symbol="Home"/>
+                </fa:NavigationViewItem.IconSource>
+            </fa:NavigationViewItem>
+
+            <fa:NavigationViewItem Content="{Binding Loc[Nav_Versions]}" Tag="Versions">
+                <fa:NavigationViewItem.IconSource>
+                    <fa:SymbolIconSource Symbol="List"/>
+                </fa:NavigationViewItem.IconSource>
+            </fa:NavigationViewItem>
+
+            <fa:NavigationViewItem Content="{Binding Loc[Nav_Settings]}" Tag="Settings">
+                <fa:NavigationViewItem.IconSource>
+                    <fa:SymbolIconSource Symbol="Setting"/>
+                </fa:NavigationViewItem.IconSource>
+            </fa:NavigationViewItem>
+        </fa:NavigationView.MenuItems>
+
+        <!-- 侧边栏底部：分隔线下方是关于 -->
+        <fa:NavigationView.FooterMenuItems>
+            <fa:NavigationViewItem Content="{Binding Loc[Nav_About]}" Tag="About">
+                <fa:NavigationViewItem.IconSource>
+                    <fa:SymbolIconSource Symbol="Help"/>
+                </fa:NavigationViewItem.IconSource>
+            </fa:NavigationViewItem>
+        </fa:NavigationView.FooterMenuItems>
+
+        <!-- 内容区 -->
+        <Grid>
+            <!-- 首页 -->
+            <Grid IsVisible="{Binding IsHome}">
+                <!-- 左上角 logo（独立元素） -->
+                <svg:Svg Path="avares://MCDArchive/logo_small.svg"
+                          Height="38" Stretch="Uniform"
+                          HorizontalAlignment="Left" VerticalAlignment="Top"
+                          Margin="26,20,0,0"/>
+
+                <!-- 标题（居中对齐，位于 SVG 下方） -->
+                <TextBlock Text="{Binding Loc[Home_Title]}" FontSize="30" FontWeight="Bold" Foreground="#FFFFFF"
+                           HorizontalAlignment="Center" VerticalAlignment="Top"
+                           Margin="0,72,0,0"/>
+
+                <!-- 状态文字：紧靠下方下载按钮上方 -->
+                <TextBlock Text="{Binding StatusText}" FontSize="13" Foreground="#A0A0A0"
+                           HorizontalAlignment="Center" VerticalAlignment="Bottom"
+                           Margin="0,0,0,96"/>
+
+                <!-- 下载/启动按钮：靠下但不碰底 -->
+                <Button Content="{Binding PrimaryActionText}"
+                        Command="{Binding PrimaryActionCommand}"
+                        IsEnabled="{Binding !IsBusy}"
+                        Background="#107C41" Foreground="White"
+                        Padding="34,12" FontWeight="Bold" FontSize="16"
+                        HorizontalAlignment="Center" VerticalAlignment="Bottom"
+                        Margin="0,0,0,40"/>
+            </Grid>
+
+            <!-- 版本列表 -->
+            <Grid IsVisible="{Binding IsVersions}" Margin="30">
+                <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center" Spacing="15">
+                    <TextBlock Text="{Binding Loc[Versions_Title]}" FontSize="24" FontWeight="Bold" Foreground="#FFFFFF" HorizontalAlignment="Center"/>
+                    <TextBlock Text="{Binding Loc[Versions_Subtitle]}" FontSize="13" Foreground="#A0A0A0" HorizontalAlignment="Center"/>
+                    <ComboBox ItemsSource="{Binding Versions}"
+                              SelectedItem="{Binding SelectedVersion}"
+                              MinWidth="280" HorizontalAlignment="Center"
+                              IsEnabled="{Binding !IsBusy}">
+                        <ComboBox.ItemTemplate>
+                            <DataTemplate x:DataType="models:McdVersion">
+                                <TextBlock Text="{Binding VersionName}" FontSize="14"/>
+                            </DataTemplate>
+                        </ComboBox.ItemTemplate>
+                    </ComboBox>
+                    <TextBlock Text="{Binding VersionLoadInfo}" FontSize="12" Foreground="#A0A0A0" HorizontalAlignment="Center"/>
+                </StackPanel>
+            </Grid>
+
+            <!-- 设置 -->
+            <Grid IsVisible="{Binding IsSettings}" Margin="30">
+                <StackPanel Spacing="20" HorizontalAlignment="Center" VerticalAlignment="Center" MaxWidth="520">
+                    <TextBlock Text="{Binding Loc[Settings_Title]}" FontSize="24" FontWeight="Bold" Foreground="#FFFFFF" HorizontalAlignment="Center"/>
+
+                    <StackPanel Spacing="5">
+                        <TextBlock Text="{Binding Loc[Settings_InstallPath]}" FontSize="13" FontWeight="SemiBold" Foreground="#DCDCDC"/>
+                        <Grid ColumnDefinitions="*, Auto">
+                            <TextBox Grid.Column="0"
+                                     Text="{Binding InstallPath, Mode=TwoWay}"
+                                     IsEnabled="{Binding !IsBusy}"
+                                     Watermark="{Binding Loc[Settings_Watermark]}"/>
+                            <Button Grid.Column="1"
+                                    Content="{Binding Loc[Settings_Browse]}"
+                                    Command="{Binding SelectFolderCommand}"
+                                    Margin="10,0,0,0"
+                                    IsEnabled="{Binding !IsBusy}"/>
+                        </Grid>
+                    </StackPanel>
+
+                    <StackPanel Orientation="Horizontal" Spacing="10" HorizontalAlignment="Center">
+                        <Button Content="{Binding Loc[Settings_FixGameFiles]}"
+                                Command="{Binding FixGameFilesCommand}"
+                                IsEnabled="{Binding !IsBusy}"
+                                Background="#444444" Foreground="#DCDCDC" Padding="15,8"/>
+                        <Button Content="{Binding Loc[Settings_FixRuntime]}"
+                                Command="{Binding FixRuntimeCommand}"
+                                IsEnabled="{Binding !IsBusy}"
+                                Background="#444444" Foreground="#DCDCDC" Padding="15,8"/>
+                    </StackPanel>
+
+                    <!-- 语言选择下拉菜单 -->
+                    <StackPanel Spacing="5">
+                        <TextBlock Text="{Binding Loc[Settings_Language]}" FontSize="13" FontWeight="SemiBold" Foreground="#DCDCDC" HorizontalAlignment="Center"/>
+                        <ComboBox ItemsSource="{Binding Languages}"
+                                  SelectedItem="{Binding SelectedLanguage}"
+                                  MinWidth="280" HorizontalAlignment="Center">
+                            <ComboBox.ItemTemplate>
+                                <DataTemplate x:DataType="models:LanguageOption">
+                                    <TextBlock Text="{Binding DisplayName}" FontSize="14"/>
+                                </DataTemplate>
+                            </ComboBox.ItemTemplate>
+                        </ComboBox>
+                    </StackPanel>
+                </StackPanel>
+            </Grid>
+
+            <!-- 关于 -->
+            <Grid IsVisible="{Binding IsAbout}" Margin="30">
+                <StackPanel Spacing="20" VerticalAlignment="Top">
+                    <!-- 说明文字（左对齐，保持原偏移） -->
+                    <TextBlock Text="{Binding Loc[About_Title]}"
+                               FontSize="16" FontWeight="Bold" Foreground="#FFFFFF"
+                               HorizontalAlignment="Left" Margin="0,92,0,0"/>
+
+                    <!-- 关于内容容器 -->
+                    <Border Background="#252526" BorderBrush="#3A3A3A" BorderThickness="1"
+                            CornerRadius="8" Padding="6">
+                        <StackPanel Spacing="4">
+                            <!-- 第一折叠栏 -->
+                            <Expander Background="#2D2D30" BorderBrush="#3A3A3A">
+                                <Expander.Header>
+                                    <Grid ColumnDefinitions="Auto, Auto, *, Auto">
+                                        <Image Source="avares://MCDArchive/favicon.png"
+                                               Width="20" Height="20" Stretch="Uniform"/>
+                                        <TextBlock Grid.Column="1" Text="Minecraft Dungeons Archive Launcher"
+                                                   Margin="8,0,0,0" FontWeight="Bold" Foreground="#FFFFFF"
+                                                   VerticalAlignment="Center"/>
+                                        <TextBlock Grid.Column="3" Text="dev (Codename: MCDArchive)"
+                                                   Foreground="#A0A0A0" FontSize="12" VerticalAlignment="Center"/>
+                                    </Grid>
+                                </Expander.Header>
+                                <StackPanel Margin="8,12,8,8" Spacing="14">
+                                    <!-- 第一折叠项：版权 + 许可证 -->
+                                    <StackPanel Spacing="4">
+                                        <Grid ColumnDefinitions="*, Auto">
+                                            <TextBlock Text="Copyright (c) 2026 CreatorCSIE"
+                                                       Foreground="#DCDCDC" FontSize="13"/>
+                                            <Button Grid.Column="1" Click="OpenLink_Click"
+                                                    CommandParameter="https://github.com/CreatorCSIE/MCDArchive/blob/main/LICENSE"
+                                                    Content="{Binding Loc[About_ViewLicense]}" Foreground="#E57834"
+                                                    Background="Transparent" BorderThickness="0"
+                                                    FontSize="13" Padding="0"/>
+                                        </Grid>
+                                        <TextBlock Text="{Binding Loc[About_GplNotice]}" Foreground="#A0A0A0" FontSize="12"/>
+                                    </StackPanel>
+                                    <!-- 第二折叠项：链接 + 项目主页 -->
+                                    <Grid ColumnDefinitions="*, Auto">
+                                        <TextBlock Text="{Binding Loc[About_Links]}" Foreground="#DCDCDC" FontSize="13"
+                                                   VerticalAlignment="Center"/>
+                                        <Button Grid.Column="1" Click="OpenLink_Click"
+                                                CommandParameter="https://github.com/CreatorCSIE/MCDArchive"
+                                                Content="{Binding Loc[About_ProjectHome]}" Foreground="#E57834"
+                                                Background="Transparent" BorderThickness="0"
+                                                FontSize="13" Padding="0"/>
+                                    </Grid>
+                                </StackPanel>
+                            </Expander>
+
+                            <!-- 第二折叠栏 -->
+                            <Expander Header="{Binding Loc[About_ExpanderIssues]}" Background="#2D2D30" BorderBrush="#3A3A3A">
+                                <Grid ColumnDefinitions="*, Auto" Margin="8,12,8,8">
+                                    <TextBlock Text="{Binding Loc[About_Feedback]}" Foreground="#DCDCDC" FontSize="13"
+                                               VerticalAlignment="Center"/>
+                                    <Button Grid.Column="1" Click="OpenLink_Click"
+                                            CommandParameter="https://github.com/CreatorCSIE/MCDArchive/issues"
+                                            Content="https://github.com/CreatorCSIE/MCDArchive/issues"
+                                            Foreground="#E57834" Background="Transparent"
+                                            BorderThickness="0" FontSize="13" Padding="0">
+                                            <StackPanel Orientation="Horizontal" Spacing="4">
+                                                <fa:SymbolIcon Symbol="Link" FontSize="12" VerticalAlignment="Center"/>
+                                                <TextBlock Text="{Binding Loc[About_SubmitIssues]}" FontSize="13" VerticalAlignment="Center"/>
+                                            </StackPanel>
+                                    </Button>
+                                </Grid>
+                            </Expander>
+                        </StackPanel>
+                    </Border>
+                </StackPanel>
+
+                <!-- 头像：右上角覆盖显示，不占用左侧内容宽度 -->
+                <Border Width="96" Height="96" CornerRadius="48" ClipToBounds="True"
+                        HorizontalAlignment="Right" VerticalAlignment="Top">
+                    <Image Source="avares://MCDArchive/68942543.png" Stretch="UniformToFill"/>
+                </Border>
+            </Grid>
+
+            <!-- 底部下载栏：跨所有页面显示（版本列表/关于/设置/主页），不覆盖侧边栏 -->
+            <Border IsVisible="{Binding IsBusy}"
+                    Background="#E6000000"
+                    BorderBrush="#3A3A3A" BorderThickness="0,1,0,0"
+                    VerticalAlignment="Bottom"
+                    Padding="20,12">
+                <Grid ColumnDefinitions="Auto, *, Auto, Auto, Auto, Auto" ColumnSpacing="12">
+                    <!-- 最左侧：状态信息（正在下载中/校验中等） -->
+                    <TextBlock Grid.Column="0" Text="{Binding StatusText}"
+                               FontSize="13" Foreground="#A0A0A0"
+                               VerticalAlignment="Center" TextWrapping="Wrap"/>
+                    <!-- 进度条：加宽成长方形 -->
+                    <ProgressBar Grid.Column="1" Value="{Binding ProgressPercentage}"
+                                 Height="14" Background="#3E3E42" Foreground="#E57834"
+                                 CornerRadius="2" VerticalAlignment="Center"/>
+                    <!-- 右侧靠近按钮：速度 -->
+                    <TextBlock Grid.Column="2" Text="{Binding SpeedText}"
+                               FontSize="13" Foreground="#E57834"
+                               VerticalAlignment="Center" HorizontalAlignment="Right"/>
+                    <!-- II：暂停（白色描边正方形） -->
+                    <Button Grid.Column="3" Content="II" Command="{Binding PauseCommand}"
+                            IsVisible="{Binding IsDownloading}"
+                            Width="34" Height="30"
+                            Background="Transparent" Foreground="White"
+                            BorderBrush="White" BorderThickness="1" CornerRadius="2"
+                            FontSize="13" FontWeight="Bold" Padding="0"/>
+                    <!-- ▶：恢复（白色描边正方形） -->
+                    <Button Grid.Column="4" Content="▶" Command="{Binding ResumeCommand}"
+                            IsVisible="{Binding IsPaused}"
+                            Width="34" Height="30"
+                            Background="Transparent" Foreground="White"
+                            BorderBrush="White" BorderThickness="1" CornerRadius="2"
+                            FontSize="13" FontWeight="Bold" Padding="0"/>
+                    <!-- ×：取消（白色描边正方形） -->
+                    <Button Grid.Column="5" Content="×" Command="{Binding CancelCommand}"
+                            IsVisible="{Binding IsBusy}"
+                            Width="34" Height="30"
+                            Background="Transparent" Foreground="White"
+                            BorderBrush="White" BorderThickness="1" CornerRadius="2"
+                            FontSize="13" FontWeight="Bold" Padding="0"/>
+                </Grid>
+            </Border>
+        </Grid>
+    </fa:NavigationView>
+</Window>

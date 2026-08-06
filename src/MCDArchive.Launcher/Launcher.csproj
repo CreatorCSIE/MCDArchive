@@ -1,0 +1,23 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <Nullable>enable</Nullable>
+    <AssemblyName>MCDArchive.Launcher</AssemblyName>
+    <RootNamespace>MCDArchive.Launcher</RootNamespace>
+    <ApplicationIcon>..\MCDArchive\favicon.ico</ApplicationIcon>
+    <!-- NativeAOT：编译为单个原生 exe，无多余运行时文件 -->
+    <PublishAot>true</PublishAot>
+    <!-- 彻底禁用调试符号，连 build 也不生成 pdb -->
+    <DebugType>none</DebugType>
+    <DebugSymbols>false</DebugSymbols>
+    <StripSymbols>true</StripSymbols>
+    <!-- GPLv3 信息 -->
+    <Authors>CreatorCSIE</Authors>
+    <PackageLicenseExpression>GPL-3.0-or-later</PackageLicenseExpression>
+    <!-- 输出到独立目录，发布时手动复制为根目录的 entry.exe -->
+    <OutputPath>..\..\build\launcher\</OutputPath>
+    <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
+    <AppendRuntimeIdentifierToOutputPath>false</AppendRuntimeIdentifierToOutputPath>
+  </PropertyGroup>
+</Project>

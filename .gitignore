@@ -1,0 +1,57 @@
+## --- [ .NET / C# ] ---
+# 忽略编译生成的二进制文件和依赖包
+[Bb]in/
+[Oo]bj/
+[Rr]elease/
+[Dd]ebug/
+
+# 忽略打包生成的 build 目录（对应你截图中的 build 文件夹）
+build/*
+!build/.gitkeep
+
+# 忽略发布输出文件夹
+publish/
+
+## --- [ IDE / Editors ] ---
+# Visual Studio 缓存与配置
+.vs/
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+
+# VS Code 配置 (如果你想保留团队统一的 launch.json，可以注释掉下面这行)
+.vscode/
+
+# Rider / JetBrains
+.idea/
+
+## --- [ 项目特有数据 (非常重要) ] ---
+# 忽略运行程序时生成的配置文件（保持 config 文件夹干净）
+# 我们只上传 manifest 目录和版本列表，但不上传用户的个性化设置
+config/settings.json
+
+# 防 DMCA：manifest 文件夹下的各版本 json 不提交到仓库，仅保留 .gitkeep 占位
+config/manifest/*
+!config/manifest/.gitkeep
+
+# 忽略程序运行期间产生的日志文件
+*.log
+
+# 忽略下载产生的临时文件（以防万一在根目录运行）
+*.part
+
+# 忽略默认安装路径产生的游戏本体文件
+# 如果你在根目录下测试，这会防止把几个 GB 的游戏传上去
+Minecraft Dungeons/
+
+## --- [ 操作系统 / 系统缓存 ] ---
+.DS_Store
+Thumbs.db
+
+## --- [ 允许追踪 (Exception) ] ---
+# 确保 config 文件夹下的核心数据不被忽略
+!config/
+!config/manifest/
+!config/mcd_versions.json
+!lang/

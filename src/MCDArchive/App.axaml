@@ -1,0 +1,43 @@
+<Application xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:fa="using:FluentAvalonia.Styling"
+             x:Class="MCDArchive.App"
+             RequestedThemeVariant="Dark">
+
+    <Application.Styles>
+        <!-- FluentAvalonia 主题 -->
+        <fa:FluentAvaloniaTheme CustomAccentColor="#E57834">
+            <fa:FluentAvaloniaTheme.Resources>
+                <!-- 1. 强调色覆盖 -->
+                <Color x:Key="SystemAccentColor">#E57834</Color>
+                <Color x:Key="SystemAccentColorDark1">#E57834</Color>
+                <Color x:Key="SystemAccentColorDark2">#E57834</Color>
+                <Color x:Key="SystemAccentColorDark3">#E57834</Color>
+                <Color x:Key="SystemAccentColorLight1">#E57834</Color>
+                <Color x:Key="SystemAccentColorLight2">#E57834</Color>
+                <Color x:Key="SystemAccentColorLight3">#E57834</Color>
+
+                <!-- 2. 将 SolidColorBrush 全改为 <Color> 类型 -->
+                <!-- Expander Header 背景色 -->
+                <Color x:Key="ExpanderHeaderBackground">#2D2D30</Color>
+                <Color x:Key="ExpanderHeaderBackgroundPointerOver">#3E3E42</Color>
+                <Color x:Key="ExpanderHeaderBackgroundPressed">#252526</Color>
+                <Color x:Key="ExpanderHeaderBackgroundDisabled">#1E1E1E</Color>
+                
+                <!-- Expander Content 内容背景色 -->
+                <Color x:Key="ExpanderContentBackground">#2D2D30</Color>
+                
+                <!-- Expander 边框颜色 -->
+                <Color x:Key="ExpanderHeaderBorderBrush">#3A3A3A</Color>
+                <Color x:Key="ExpanderHeaderBorderBrushPointerOver">#3A3A3A</Color>
+                <Color x:Key="ExpanderHeaderBorderBrushPressed">#3A3A3A</Color>
+                <Color x:Key="ExpanderContentBorderBrush">#3A3A3A</Color>
+
+                <!-- 卡片充填色 -->
+                <Color x:Key="CardBackgroundFillColorDefault">#2D2D30</Color>
+                <Color x:Key="CardBackgroundFillColorSecondary">#252526</Color>
+                <Color x:Key="CardStrokeColorDefault">#3A3A3A</Color>
+            </fa:FluentAvaloniaTheme.Resources>
+        </fa:FluentAvaloniaTheme>
+    </Application.Styles>
+</Application>

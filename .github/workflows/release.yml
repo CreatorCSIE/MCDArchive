@@ -1,0 +1,69 @@
+name: Build and Release
+
+on:
+  push:
+    branches:
+      - dev
+      - main
+    tags:
+      - '[0-9]*' # 匹配 1.0.0, 2024.1 等
+
+jobs:
+  build:
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+
+      # 1. 发布主程序到 /publish/app
+      #    self-contained：内置 .NET 运行时，客户无需安装
+      - name: Publish Main App
+        run: |
+          dotnet publish src/MCDArchive/MCDArchive.csproj -c Release -r win-x64 --self-contained -o ./publish/app /p:DebugType=none /p:DebugSymbols=false
+
+      # 2. 发布引导程序 (MCDArchive.Launcher.exe，NativeAOT 单文件)
+      - name: Publish Launcher
+        run: |
+          dotnet publish src/MCDArchive.Launcher/Launcher.csproj -c Release -r win-x64 -o ./publish /p:PublishAot=true
+
+      # 3. 整理文件 (删除 AOT 可能残留的少量辅助文件)
+      - name: Organize Files
+        shell: pwsh
+        run: |
+          # 复制资源
+          if (Test-Path "./lang") { Copy-Item -Path "./lang" -Destination "./publish/lang" -Recurse }
+          if (Test-Path "./config") { Copy-Item -Path "./config" -Destination "./publish/config" -Recurse }
+          
+          # 清理：如果还有残留的 .pdb 或 .exp .lib (AOT 编译有时会产生)
+          Get-ChildItem -Path "./publish/" -Include *.pdb,*.exp,*.lib,*.ilk -Recurse | Remove-Item -Force
+
+      # 4. 仅 dev 分支上传到 Artifacts；main 分支只跑构建，不上传
+      - name: Upload Artifact
+        if: github.ref == 'refs/heads/dev'
+        uses: actions/upload-artifact@v4
+        with:
+          name: MCDArchive-Dev
+          path: ./publish/
+          retention-days: 14
+
+      # 5. 只有打标签时才发布 Release；zip 命名：MCDArchive-<tag>.zip（连字符分隔，符合 semver 包命名）
+      - name: Zip for Release
+        if: startsWith(github.ref, 'refs/tags/')
+        shell: pwsh
+        run: Compress-Archive -Path ./publish/* -DestinationPath "MCDArchive-${{ github.ref_name }}.zip"
+
+      - name: Create GitHub Release
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v1
+        with:
+          files: MCDArchive-*.zip
+          generate_release_notes: true
+          draft: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
